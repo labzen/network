@@ -7,13 +7,13 @@
   <parent>
     <artifactId>parent</artifactId>
     <groupId>cn.labzen</groupId>
-    <version>11.9.1</version>
+    <version>11.9.2</version>
     <relativePath/>
   </parent>
 
   <artifactId>network</artifactId>
   <packaging>jar</packaging>
-  <version>1.0.0</version>
+  <version>1.0.1</version>
   <name>Labzen.Network</name>
   <description>Labzen Network - https utils, tcp utils, ntp and onvif utils....</description>
   <url>https://github.com/labzen/network</url>
@@ -50,7 +50,7 @@
       <dependency>
         <groupId>cn.labzen</groupId>
         <artifactId>tool</artifactId>
-        <version>1.3.1</version>
+        <version>${labzen.tool.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
