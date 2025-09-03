@@ -1,5 +1,9 @@
 package cn.labzen.network.onvif;
 
+import cn.labzen.network.onvif.device.Device;
+import cn.labzen.network.onvif.device.HikVisionDevice;
+import cn.labzen.network.onvif.listener.DiscoveredAllDevicesListener;
+import cn.labzen.network.onvif.listener.DiscoveryFinishedListener;
 import org.junit.jupiter.api.Test;
 import org.junit.platform.commons.logging.Logger;
 import org.junit.platform.commons.logging.LoggerFactory;
@@ -14,13 +18,13 @@ public class OnvifTest {
   void testDiscovery() {
     long timeout = 20000;
 
-    logger.info(() -> "broadcast addresses: " + Onvif.INSTANCE.broadcastAddresses());
-    logger.info(() -> "interface addresses: " + Onvif.INSTANCE.interfaceAddresses());
+    logger.info(() -> "broadcast addresses: " + Onvif.broadcastAddresses());
+    logger.info(() -> "interface addresses: " + Onvif.interfaceAddresses());
 
     logger.info(() -> "========================================================");
 
     Onvif.create((int) timeout)
-         .mode(DiscoveryMode.HIK_VISION)
+         .setMode(DiscoveryMode.HIK_VISION)
          .listen(() -> logger.info(() -> "started at " + LocalDateTime.now()))
          .listen((hostname, devices) -> {
            logger.info(() -> "===> found single host <<" + hostname + ">> devices....");
@@ -38,6 +42,7 @@ public class OnvifTest {
     try {
       Thread.sleep(timeout + 1000);
     } catch (InterruptedException e) {
+      //noinspection CallToPrintStackTrace
       e.printStackTrace();
     }
   }

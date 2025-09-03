@@ -6,7 +6,7 @@ public class NtpTest {
 
   @Test
   void request() {
-    double time = NtpClient.request("ntp.aliyun.com", 123);
+    double time = NTPClient.request("ntp.aliyun.com", 123);
     System.out.println(time);
   }
 }
