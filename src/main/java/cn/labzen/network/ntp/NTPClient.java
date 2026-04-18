@@ -54,14 +54,28 @@ public final class NTPClient {
       datagramSocket.setSoTimeout(timeout);
       datagramSocket.send(outgoing);
 
+      long t1 = System.currentTimeMillis();  // 客户端发送请求的时间
+
       DatagramPacket incoming = new DatagramPacket(data, data.length);
       datagramSocket.receive(incoming);
 
-      // 这里要加2208988800，是因为获得到的时间是格林尼治时间，所以要变成东八区的时间，否则会与与北京时间有8小时的时差
-      double destinationTimestamp = System.currentTimeMillis() / 1000.0 + Packet.TIMEZONE_8;
+      long t4 = System.currentTimeMillis();  // 客户端接收响应的时间
 
       Packet resolved = PacketResolver.resolve(incoming.getData());
-      return ((resolved.recTime() - resolved.oriTime()) + (resolved.transTime() - destinationTimestamp)) / 2;
+
+      // T2 = 服务器接收时间, T3 = 服务器发送时间
+      // NTP服务器返回的时间戳已经是Unix时间格式（经过decodeTimestamp转换）
+      double t2 = resolved.recTime();
+      double t3 = resolved.transTime();
+
+      // 根据RFC 2030: θ = ((T2 - T1) + (T3 - T4)) / 2
+      // 将T1和T4转换为秒（与服务器时间格式一致）
+      double t1Seconds = t1 / 1000.0;
+      double t4Seconds = t4 / 1000.0;
+
+      // 时间偏移量 = ((T2 - T1) + (T3 - T4)) / 2
+      // 为负数时，表示本机时间快于NTP服务器时间
+      return ((t2 - t1Seconds) + (t3 - t4Seconds)) / 2;
     } catch (IOException e) {
       throw new NTPException(e);
     }

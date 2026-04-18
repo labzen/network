@@ -13,6 +13,7 @@ import cn.labzen.tool.feature.id.SystemClock;
 import cn.labzen.tool.util.Randoms;
 
 import java.net.*;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.*;
@@ -121,42 +122,48 @@ public class Discoverer {
         Packet packet = new Packet(UUID.randomUUID().toString(), mode);
         String message = packet.toData();
 
-        new Thread(() -> {
-          long timerStarted = SystemClock.now();
-          send(datagramSocket, address, message);
-
-          try {
-            while (SystemClock.now() - timerStarted < timeout) {
-              DatagramPacket dp = new DatagramPacket(new byte[8192], 8192);
-              datagramSocket.receive(dp);
-
-              String response = new String(dp.getData(), 0, dp.getLength());
-              String hostname = dp.getAddress().getHostName();
-              List<? extends Device> devices = switch (mode) {
-                case ONVIF -> new OnvifMessageParser(hostname, response).parse();
-                case UPNP -> new UpnpMessageParser(hostname, response).parse();
-                case HIK_VISION -> new HikVisionMessageParser(hostname, response).parse();
-              };
-
-              foundCount.addAndGet(devices.size());
-
-              if (discoveredHostDevicesListener != null) {
-                discoveredHostDevicesListener.found(hostname, devices);
-              }
-              if (discoveredAllDevicesListener != null) {
-                discoveredAllDevicesListener.found(devices);
-              }
-            }
-          } catch (Exception e) {
-            throw new OnvifException(e);
-          } finally {
-            latch.countDown();
-          }
-        }).start();
+        receiveResponses(datagramSocket, address, message);
       } catch (SocketException e) {
         throw new OnvifException(e);
+      } finally {
+        latch.countDown();
       }
     };
+  }
+
+  private void receiveResponses(DatagramSocket datagramSocket, InetAddress address, String message) {
+    send(datagramSocket, address, message);
+
+    long timerStarted = SystemClock.now();
+    while (SystemClock.now() - timerStarted < timeout) {
+      try {
+        DatagramPacket dp = new DatagramPacket(new byte[8192], 8192);
+        datagramSocket.receive(dp);
+
+        String response = new String(dp.getData(), 0, dp.getLength(), StandardCharsets.UTF_8);
+        String hostname = dp.getAddress().getHostName();
+        List<? extends Device> devices = switch (mode) {
+          case ONVIF -> new OnvifMessageParser(hostname, response).parse();
+          case UPNP -> new UpnpMessageParser(hostname, response).parse();
+          case HIK_VISION -> new HikVisionMessageParser(hostname, response).parse();
+        };
+
+        foundCount.addAndGet(devices.size());
+
+        if (discoveredHostDevicesListener != null) {
+          discoveredHostDevicesListener.found(hostname, devices);
+        }
+        if (discoveredAllDevicesListener != null) {
+          discoveredAllDevicesListener.found(devices);
+        }
+      } catch (SocketTimeoutException e) {
+        // Timeout is expected, continue loop to check if we should still be listening
+        break;
+      } catch (Exception e) {
+        // Log and continue receiving other responses
+        // Could add logging here if needed
+      }
+    }
   }
 
   private void send(DatagramSocket socket, InetAddress address, String message) {

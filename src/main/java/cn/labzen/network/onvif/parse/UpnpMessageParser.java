@@ -30,6 +30,9 @@ public class UpnpMessageParser extends MessageParser {
 
     int start = index + target.length();
     int end = message.indexOf("\r\n", start);
-    return message.substring(start, end);
+    if (end < 0) {
+      end = message.length();
+    }
+    return message.substring(start, end).trim();
   }
 }

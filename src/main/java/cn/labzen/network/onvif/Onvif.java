@@ -9,6 +9,7 @@ import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.util.*;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
 public final class Onvif {
 
@@ -51,12 +52,11 @@ public final class Onvif {
     return interfaces.stream().flatMap(ni -> {
       try {
         if (ni.isLoopback() || !ni.isUp()) {
-          return null;
-        } else {
-          return ni.getInterfaceAddresses().stream().map(function);
+          return Stream.empty();
         }
+        return ni.getInterfaceAddresses().stream().map(function);
       } catch (SocketException e) {
-        return null;
+        return Stream.empty();
       }
     }).filter(Objects::nonNull).toList();
   }

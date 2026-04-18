@@ -18,7 +18,7 @@ class PacketResolver {
     byte poll = data[2];
     byte precision = data[3];
 
-    double rde = data[4] * 256.0 +
+    double rde = unsignedByteToShort(data[4]) * 256.0 +
                  unsignedByteToShort(data[5]) +
                  unsignedByteToShort(data[6]) / 256.0 +
                  unsignedByteToShort(data[7]) / 65536.0;
@@ -26,7 +26,7 @@ class PacketResolver {
     double rdi = unsignedByteToShort(data[8]) * 256.0 +
                  unsignedByteToShort(data[9]) +
                  unsignedByteToShort(data[10]) / 256.0 +
-                 unsignedByteToShort(data[11]) / 65535.0;
+                 unsignedByteToShort(data[11]) / 65536.0;
 
     byte[] rid = {data[12], data[13], data[14], data[15]};
 
@@ -41,9 +41,11 @@ class PacketResolver {
   public static byte[] structuring(Packet packet) {
     byte[] data = new byte[48];
 
-    data[0] = (byte) (((packet.li() != null ? packet.li() : 0) << 6) | (packet.vn() << 3) | packet.mode());
+    byte vn = packet.vn() != null ? packet.vn() : 4;  // 默认NTP版本4
+    byte mode = packet.mode() != null ? packet.mode() : 3;  // 默认客户模式
+    data[0] = (byte) (((packet.li() != null ? packet.li() : 0) << 6) | (vn << 3) | mode);
     if (packet.stratum() != null) {
-      data[1] = (byte) (short) packet.stratum();
+      data[1] = (byte) (packet.stratum() & 0xFF);
     }
     if (packet.poll() != null) {
       data[2] = packet.poll();
@@ -53,7 +55,7 @@ class PacketResolver {
     }
 
     if (packet.rde() != null) {
-      int l = (int) (packet.rde() * 65535.0);
+      int l = (int) (packet.rde() * 65536.0);
       data[4] = (byte) ((l >> 24) & 0xFF);
       data[5] = (byte) ((l >> 16) & 0xFF);
       data[6] = (byte) ((l >> 8) & 0xFF);
@@ -61,7 +63,7 @@ class PacketResolver {
     }
 
     if (packet.rdi() != null) {
-      int l = (int) (packet.rdi() * 65535.0);
+      int l = (int) (packet.rdi() * 65536.0);
       data[8] = (byte) ((l >> 24) & 0xFF);
       data[9] = (byte) ((l >> 16) & 0xFF);
       data[10] = (byte) ((l >> 8) & 0xFF);
@@ -91,37 +93,46 @@ class PacketResolver {
   }
 
   private static short unsignedByteToShort(byte b) {
-    return (b & 0x80) == 0x80 ? (short) (128 + (b & 0x7f)) : (short) b;
+    return (short) (b & 0xFF);
   }
 
   private static double decodeTimestamp(byte[] data, int pointer) {
-    double r = 0.0;
+    // NTP时间戳是网络字节序（大端序）
+    // 前32位是整数部分（秒），后32位是小数部分
+    long seconds = ((long) (data[pointer] & 0xFF) << 24) |
+                  ((long) (data[pointer + 1] & 0xFF) << 16) |
+                  ((long) (data[pointer + 2] & 0xFF) << 8) |
+                  (data[pointer + 3] & 0xFF);
 
-    for (int i = 0; i <= 7; i++) {
-      r += unsignedByteToShort(data[pointer + i]) * Math.pow(2.0, (3.0 - i) * 8);
-    }
+    long fraction = ((long) (data[pointer + 4] & 0xFF) << 24) |
+                   ((long) (data[pointer + 5] & 0xFF) << 16) |
+                   ((long) (data[pointer + 6] & 0xFF) << 8) |
+                   (data[pointer + 7] & 0xFF);
 
-    return r;
+    double timestamp = seconds + (fraction / 4294967296.0);
+
+    // NTP时间戳从1900年1月1日开始，Java时间从1970年1月1日开始
+    // 需要减去2208988800秒的偏移量转换为Unix时间戳
+    return timestamp - Packet.TIMEZONE_8;
   }
 
   private static void encodeTimestamp(byte[] data, int pointer, double timestamp) {
-    double tt = timestamp;
-    // Converts a double into a 64-bit fixed point
-    for (int i = 0; i <= 7; i++) {
-      // 2^24, 2^16, 2^8, .. 2^-32
-      double base = Math.pow(2.0, (3 - i) * 8);
+    // 将Unix时间戳转换为NTP时间戳
+    // NTP时间戳 = Unix时间戳 + 2208988800秒(NTP纪元偏移)
+    double ntpTimestamp = timestamp + Packet.TIMEZONE_8;
 
-      // Capture byte value
-      data[pointer + i] = (byte) ((int) (tt / base));
+    long seconds = (long) ntpTimestamp;
+    long fraction = (long) ((ntpTimestamp - seconds) * 4294967296.0);
 
-      // Subtract captured value from remaining total
-      tt -= unsignedByteToShort(data[pointer + i]) * base;
-    }
+    data[pointer] = (byte) ((seconds >> 24) & 0xFF);
+    data[pointer + 1] = (byte) ((seconds >> 16) & 0xFF);
+    data[pointer + 2] = (byte) ((seconds >> 8) & 0xFF);
+    data[pointer + 3] = (byte) (seconds & 0xFF);
 
-    // From RFC 2030: It is advisable to fill the non-significant
-    // low order bits of the timestamp with a random, unbiased
-    // bit string, both to avoid systematic roundoff errors and as
-    // a means of loop detection and replay detection.
+    data[pointer + 4] = (byte) ((fraction >> 24) & 0xFF);
+    data[pointer + 5] = (byte) ((fraction >> 16) & 0xFF);
+    data[pointer + 6] = (byte) ((fraction >> 8) & 0xFF);
+    // 根据RFC 2030，建议用随机数填充低有效位
     data[pointer + 7] = (byte) (RandomGenerator.getDefault().nextDouble() * 255.0);
   }
 }

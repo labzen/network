@@ -28,14 +28,25 @@ public class HikVisionMessageParser extends MessageParser {
           values.getOrDefault("DeviceSN", ""),
           values.getOrDefault("IPv4Address", ""),
           values.getOrDefault("IPv4Gateway", ""),
-          Integer.parseInt(values.getOrDefault("CommandPort", "")),
+          parsePort(values.getOrDefault("CommandPort", "")),
           values.getOrDefault("MAC", ""),
           values.getOrDefault("SoftwareVersion", ""),
           values.getOrDefault("BootTime", ""),
           values.getOrDefault("SafeCode", ""));
       return List.of(device);
     } catch (JsonProcessingException e) {
-      throw new OnvifException("读取信息失败：{}", message);
+      throw new OnvifException(e, "读取信息失败：{}", message);
+    }
+  }
+
+  private static int parsePort(String portStr) {
+    if (portStr == null || portStr.isBlank()) {
+      return 0;
+    }
+    try {
+      return Integer.parseInt(portStr.trim());
+    } catch (NumberFormatException e) {
+      return 0;
     }
   }
 }
