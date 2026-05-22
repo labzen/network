@@ -38,7 +38,6 @@ public record Packet(String uuid, DiscoveryMode mode) {
       </Probe>
       """;
 
-  //private String name;
   public String toData() {
     return switch (mode) {
       case ONVIF -> Strings.format(SOAP_DISCOVERY_XML, uuid);

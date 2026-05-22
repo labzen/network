@@ -113,13 +113,13 @@ class PacketResolver {
 
     // NTP时间戳从1900年1月1日开始，Java时间从1970年1月1日开始
     // 需要减去2208988800秒的偏移量转换为Unix时间戳
-    return timestamp - Packet.TIMEZONE_8;
+    return timestamp - Packet.NTP_EPOCH_OFFSET;
   }
 
   private static void encodeTimestamp(byte[] data, int pointer, double timestamp) {
     // 将Unix时间戳转换为NTP时间戳
     // NTP时间戳 = Unix时间戳 + 2208988800秒(NTP纪元偏移)
-    double ntpTimestamp = timestamp + Packet.TIMEZONE_8;
+    double ntpTimestamp = timestamp + Packet.NTP_EPOCH_OFFSET;
 
     long seconds = (long) ntpTimestamp;
     long fraction = (long) ((ntpTimestamp - seconds) * 4294967296.0);

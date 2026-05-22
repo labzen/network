@@ -72,7 +72,12 @@ public class Discoverer {
 
   public void discovery() {
     List<InetAddress> inetAddresses = Onvif.interfaceAddresses();
-    assert inetAddresses != null;
+    if (inetAddresses == null || inetAddresses.isEmpty()) {
+      if (discoveryFinishedListener != null) {
+        discoveryFinishedListener.finished(0);
+      }
+      return;
+    }
     List<Runnable> runners = inetAddresses.stream().map(this::discoveryRunner).toList();
 
     latch = new CountDownLatch(inetAddresses.size());
@@ -105,7 +110,7 @@ public class Discoverer {
             discoveryFinishedListener.finished(foundCount.get());
           }
         } catch (InterruptedException e) {
-          // ignore this exception
+          Thread.currentThread().interrupt();
         }
       });
       monitor.shutdown();

@@ -72,34 +72,34 @@ public final class Addresses {
    * 获取客户端IP（优化版本）
    */
   public static String remoteIp(HttpServletRequest request) {
-    // 按优先级检查各个头部
-    String ip = checkHeader(request, X_FORWARDED_FOR);
-    if (isValidIp(ip)) {
-      return getFirstValidIpFromList(ip);
+    // 1. 优先检查 X-Forwarded-For（可能包含多个IP，需先拆分再逐项校验）
+    String forwardedFor = checkHeader(request, X_FORWARDED_FOR);
+    if (Strings.isNotBlank(forwardedFor)) {
+      String ip = getFirstValidIpFromList(forwardedFor);
+      if (ip != null) {
+        return ip;
+      }
     }
 
-    ip = checkHeader(request, PROXY_CLIENT_IP);
-    if (isValidIp(ip)) {
-      return ip;
+    // 2. 检查单值代理头部
+    for (String header : new String[]{PROXY_CLIENT_IP, WL_PROXY_CLIENT_IP, HTTP_CLIENT_IP}) {
+      String ip = checkHeader(request, header);
+      if (isValidIp(ip)) {
+        return ip;
+      }
     }
 
-    ip = checkHeader(request, WL_PROXY_CLIENT_IP);
-    if (isValidIp(ip)) {
-      return ip;
+    // 3. HTTP_X_FORWARDED_FOR（也可能包含多个IP）
+    String httpForwardedFor = checkHeader(request, HTTP_X_FORWARDED_FOR);
+    if (Strings.isNotBlank(httpForwardedFor)) {
+      String ip = getFirstValidIpFromList(httpForwardedFor);
+      if (ip != null) {
+        return ip;
+      }
     }
 
-    ip = checkHeader(request, HTTP_CLIENT_IP);
-    if (isValidIp(ip)) {
-      return ip;
-    }
-
-    ip = checkHeader(request, HTTP_X_FORWARDED_FOR);
-    if (isValidIp(ip)) {
-      return ip;
-    }
-
-    // 最后使用远程地址
-    return Optional.ofNullable(request.getRemoteAddr()).filter(Addresses::isValidIp).orElse("127.0.0.1");
+    // 4. 最后使用远程地址
+    return Optional.ofNullable(request.getRemoteAddr()).filter(Addresses::isIp).orElse("127.0.0.1");
   }
 
   /**
@@ -113,7 +113,7 @@ public final class Addresses {
     String[] ips = ipList.split("\\s*,\\s*");
     for (String ip : ips) {
       String trimmedIp = ip.trim();
-      if (isValidIp(trimmedIp) && !isInternalIp(trimmedIp)) {
+      if (isValidIp(trimmedIp)) {
         return trimmedIp;
       }
     }
@@ -148,11 +148,7 @@ public final class Addresses {
     }
 
     // 127.0.0.0 - 127.255.255.255
-    if (first == 127) {
-      return true;
-    }
-
-    return false;
+    return first == 127;
   }
 
   /**
@@ -177,31 +173,45 @@ public final class Addresses {
    * 增强版IP获取方法，支持更多头部和更好的过滤
    */
   public static String getClientIp(HttpServletRequest request) {
-    // 检查常见的代理头部（按优先级排序）
-    String[] headerNames = {"X-Real-IP",
-                            "X-Forwarded-For",
-                            "Proxy-Client-IP",
-                            "WL-Proxy-Client-IP",
-                            "HTTP_CLIENT_IP",
-                            "HTTP_X_FORWARDED_FOR",
-                            "X-Cluster-Client-IP"};
+    // 1. X-Real-IP（单值头，常见于 Nginx）
+    String ip = checkHeader(request, "X-Real-IP");
+    if (isValidIp(ip)) {
+      return ip;
+    }
 
-    for (String header : headerNames) {
-      String ip = checkHeader(request, header);
-      if (isValidIp(ip)) {
-        // 对于X-Forwarded-For，需要处理多个IP的情况
-        if (X_FORWARDED_FOR.equals(header)) {
-          String firstValidIp = getFirstValidIpFromList(ip);
-          if (firstValidIp != null) {
-            return firstValidIp;
-          }
-        } else {
-          return ip;
-        }
+    // 2. X-Forwarded-For（可能包含多个IP，需先拆分再逐项校验）
+    String forwardedFor = checkHeader(request, X_FORWARDED_FOR);
+    if (Strings.isNotBlank(forwardedFor)) {
+      String firstValidIp = getFirstValidIpFromList(forwardedFor);
+      if (firstValidIp != null) {
+        return firstValidIp;
       }
     }
 
-    // 最后返回远程地址
+    // 3. 检查其他单值代理头部
+    for (String header : new String[]{"Proxy-Client-IP", "WL-Proxy-Client-IP", "HTTP_CLIENT_IP"}) {
+      ip = checkHeader(request, header);
+      if (isValidIp(ip)) {
+        return ip;
+      }
+    }
+
+    // 4. HTTP_X_FORWARDED_FOR（也可能包含多个IP）
+    String httpForwardedFor = checkHeader(request, HTTP_X_FORWARDED_FOR);
+    if (Strings.isNotBlank(httpForwardedFor)) {
+      String firstValidIp = getFirstValidIpFromList(httpForwardedFor);
+      if (firstValidIp != null) {
+        return firstValidIp;
+      }
+    }
+
+    // 5. X-Cluster-Client-IP
+    ip = checkHeader(request, "X-Cluster-Client-IP");
+    if (isValidIp(ip)) {
+      return ip;
+    }
+
+    // 6. 最后返回远程地址
     return Optional.ofNullable(request.getRemoteAddr()).filter(addr -> !addr.isBlank()).orElse("127.0.0.1");
   }
 }

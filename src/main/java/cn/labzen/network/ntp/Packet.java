@@ -51,22 +51,60 @@ package cn.labzen.network.ntp;
  * @param digest    Message Digest - 消息摘要。长度=128bit。对消息头（不包含Key Identifier和Message Digest）的MD5值摘要
  */
 public record Packet(Byte li, Byte vn, Byte mode, Short stratum, Byte poll, Byte precision, Double rde, Double rdi,
-                     byte[] rid,
-                     Double refTime, Double oriTime, Double recTime, Double transTime, String keyId, String digest) {
+                     byte[] rid, Double refTime, Double oriTime, Double recTime, Double transTime, String keyId,
+                     String digest) {
 
-     static final double TIMEZONE_8 = 2208988800.0;
+  static final double NTP_EPOCH_OFFSET = 2208988800.0;
 
-    Packet(Byte li, Byte vn, Byte mode, Short stratum, Byte poll, Byte precision, Double rde, Double rdi,
-           byte[] rid,
-           Double refTime, Double oriTime, Double recTime, Double transTime) {
-        this(li, vn, mode, stratum, poll, precision, rde, rdi, rid, refTime, oriTime, recTime, transTime, null, null);
-    }
+  Packet(Byte li,
+         Byte vn,
+         Byte mode,
+         Short stratum,
+         Byte poll,
+         Byte precision,
+         Double rde,
+         Double rdi,
+         byte[] rid,
+         Double refTime,
+         Double oriTime,
+         Double recTime,
+         Double transTime) {
+    this(li, vn, mode, stratum, poll, precision, rde, rdi, rid, refTime, oriTime, recTime, transTime, null, null);
+  }
 
-    Packet(byte vn, byte mode) {
-        this(null, vn, mode, null, null, null, null, null, null, null, null, null, System.currentTimeMillis() / 1000.0 + TIMEZONE_8, null, null);
-    }
+  Packet(byte vn, byte mode) {
+    this(null,
+        vn,
+        mode,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        System.currentTimeMillis() / 1000.0 + NTP_EPOCH_OFFSET,
+        null,
+        null);
+  }
 
-    Packet() {
-        this(null, null, null, null, null, null, null, null, null, null, null, null, System.currentTimeMillis() / 1000.0 + TIMEZONE_8, null, null);
-    }
+  Packet() {
+    this(null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        System.currentTimeMillis() / 1000.0 + NTP_EPOCH_OFFSET,
+        null,
+        null);
+  }
 }
